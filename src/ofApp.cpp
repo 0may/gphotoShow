@@ -36,15 +36,18 @@ void ofApp::update(){
 
     if (m_valueA0 >= m_threshold && m_state == LOW) {
 
+      // turn on Arduino's LED when IR intensity rises above threshold
       m_state = HIGH;
       m_arduino.sendDigital(13, 1);
 
     }
     else if (m_valueA0 < m_threshold && m_state == HIGH) {
 
+      // turn off Arduino's LED when IR intensity falls below threshold
       m_state = LOW;
       m_arduino.sendDigital(13, 0);
 
+      // capture image if capture is enabled and last image capture is older than 5 seconds
       if (m_enableCapture && ofGetElapsedTimef() - m_lastCaptureTriggered > 5.0f) {
         m_lastCaptureTriggered = ofGetElapsedTimef();
         captureImage();
@@ -71,7 +74,8 @@ void ofApp::draw(){
     ofDrawBitmapStringHighlight("Press 'F1' to switch between CALIBRATION and CAPTURE MODE", 200,220);
     ofDrawBitmapStringHighlight("Press 'F5' to toggle between WINDOW and FULLSCREEN MODE", 200,240);
     ofDrawBitmapStringHighlight("Press 'F9' to EXIT", 200,260);
-    ofDrawBitmapStringHighlight("Threshold:    " + ofToString(m_threshold) + "\nSensor value: " + ofToString(m_valueA0) + "\nSensor values range from 0 (no IR light) to 800 (high IR light intensity)", 200,300);
+    ofDrawBitmapStringHighlight("Use ARROW keys to adjust THRESHOLD", 200,280);
+    ofDrawBitmapStringHighlight("Threshold:    " + ofToString(m_threshold) + "\nSensor value: " + ofToString(m_valueA0), 200,320);
 
   }
 }
@@ -84,27 +88,41 @@ void ofApp::exit(){
 
   delete m_pDispImg;
   delete m_pLoadImg;
-
 }
 
 
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key){
   //cout << key << endl;
-  if (key == 265) {
-    //while (m_busy);
 
+  if (key == 265) { // F9
+    //while (m_busy);
     ofExit();
   }
-  else if (key == 257 && m_arduinoSetup) {
-
+  else if (key == 257 && m_arduinoSetup) { // F1
     m_enableCapture = !m_enableCapture;
-
-   // captureImage();
   }
-  else if (key == 261) {
+  else if (key == 261) { // F5
     ofToggleFullscreen();
   }
+  else if (key == 357 && !m_enableCapture) { // UP ARROW
+    m_threshold += 10;
+  }
+  else if (key == 357 && !m_enableCapture) { // DOWN ARROW
+    m_threshold -= 10;
+  }
+  else if (key == 357 && !m_enableCapture) { // LEFT ARROW
+    m_threshold += 1;
+  }
+  else if (key == 357 && !m_enableCapture) { // RIGHT ARROW
+    m_threshold -= 1;
+  }
+
+  // limit threshold range
+  if (m_threshold > 830)
+    m_threshold = 830;
+  else if (m_threshold < 0)
+    m_threshold = 0;
 }
 
 
@@ -117,11 +135,14 @@ bool ofApp::captureImage() {
 
   m_busy = true;
 
+  // try to capture image
   ret = (system("gphoto2 --capture-image-and-download --force-overwrite --filename=data/latest.jpg") == 0);
 
   if (ret) {
+    // load captured image into image object
     ret = m_pLoadImg->load("latest.jpg");
 
+    // resize image to display size due to problems with large DSLR images on Raspberry Pi
     m_pLoadImg->resize(m_dispW, m_dispW/m_dispImgAspect);
   }
 
@@ -138,6 +159,7 @@ void ofApp::drawImage() {
   if (m_newImg) {
     m_busy = true;
 
+    // switch image objects for displaying and loading
     ofImage* pTmp = m_pDispImg;
     m_pDispImg = m_pLoadImg;
     m_pLoadImg = pTmp;
@@ -152,6 +174,7 @@ void ofApp::drawImage() {
 
   if (m_pDispImg->isAllocated()) {
 
+    // compute image part to be displayed. required for differing aspect ratios of screen and image
     float sx = 0.0f;
     float sy = 0.0f;
     float sw = m_dispImgW;
