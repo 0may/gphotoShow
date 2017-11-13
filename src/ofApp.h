@@ -43,12 +43,13 @@ private:
 
 	ofArduino m_arduino;
 	int m_valueA0;
-	bool m_arduinoSetup;
+	bool m_isArduinoConnected;
+	bool m_isArduinoSetup;
 
 	int m_threshold;
 	IrSensorState m_state;
 
 	float m_lastCaptureTriggered;
 
-	bool m_enableCapture;
+	bool m_captureEnabled;
 };

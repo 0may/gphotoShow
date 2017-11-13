@@ -7,8 +7,9 @@ void ofApp::setup(){
 
   m_busy = false;
   m_newImg = false;
-  m_arduinoSetup = false;
-  m_enableCapture = false;
+  m_isArduinoConnected = false;
+  m_isArduinoSetup = false;
+  m_captureEnabled = false;
 
   m_valueA0 = -1;
   m_state = LOW;
@@ -17,7 +18,7 @@ void ofApp::setup(){
 
   m_lastCaptureTriggered = -1.0;
 
-  m_arduino.connect("/dev/ttyACM0", 57600);
+  m_isArduinoConnected = m_arduino.connect("/dev/ttyACM0", 57600);
 
 	// listen for EInitialized notification. this indicates that
 	// the arduino is ready to receive commands and it is safe to
@@ -30,27 +31,29 @@ void ofApp::setup(){
 //--------------------------------------------------------------
 void ofApp::update(){
 
-  m_arduino.update();
+  if (m_isArduinoConnected) {
+    m_arduino.update();
 
-  if (m_arduinoSetup && m_valueA0 > -1) {
+    if (m_isArduinoSetup && m_valueA0 > -1) {
 
-    if (m_valueA0 >= m_threshold && m_state == LOW) {
+      if (m_valueA0 >= m_threshold && m_state == LOW) {
 
-      // turn on Arduino's LED when IR intensity rises above threshold
-      m_state = HIGH;
-      m_arduino.sendDigital(13, 1);
+        // turn on Arduino's LED when IR intensity rises above threshold
+        m_state = HIGH;
+        m_arduino.sendDigital(13, 1);
 
-    }
-    else if (m_valueA0 < m_threshold && m_state == HIGH) {
+      }
+      else if (m_valueA0 < m_threshold && m_state == HIGH) {
 
-      // turn off Arduino's LED when IR intensity falls below threshold
-      m_state = LOW;
-      m_arduino.sendDigital(13, 0);
+        // turn off Arduino's LED when IR intensity falls below threshold
+        m_state = LOW;
+        m_arduino.sendDigital(13, 0);
 
-      // capture image if capture is enabled and last image capture is older than 5 seconds
-      if (m_enableCapture && ofGetElapsedTimef() - m_lastCaptureTriggered > 5.0f) {
-        m_lastCaptureTriggered = ofGetElapsedTimef();
-        captureImage();
+        // capture image if capture is enabled and last image capture is older than 5 seconds
+        if (m_captureEnabled && ofGetElapsedTimef() - m_lastCaptureTriggered > 5.0f) {
+          m_lastCaptureTriggered = ofGetElapsedTimef();
+          captureImage();
+        }
       }
     }
   }
@@ -65,10 +68,14 @@ void ofApp::draw(){
 
   drawImage();
 
-  if (!m_arduinoSetup) {
+  if (!m_isArduinoConnected) {
+    ofDrawBitmapStringHighlight("ERROR: Could not connect to Arduino on Port '/dev/ttyACM0'", 200,200);
+    ofDrawBitmapStringHighlight("Press 'SPACE' to trigger image capture for testing", 200,220);
+  }
+  else if (!m_isArduinoSetup) {
     ofDrawBitmapStringHighlight("Initializing Arduino...", 200,200);
   }
-  else if (!m_enableCapture) {
+  else if (!m_captureEnabled) {
 
     ofDrawBitmapStringHighlight("CALIBRATION MODE", 200, 200);
     ofDrawBitmapStringHighlight("Press 'F1' to switch between CALIBRATION and CAPTURE MODE", 200,220);
@@ -99,23 +106,27 @@ void ofApp::keyPressed(int key){
     //while (m_busy);
     ofExit();
   }
-  else if (key == 257 && m_arduinoSetup) { // F1
-    m_enableCapture = !m_enableCapture;
+  else if (key == 257 && m_isArduinoSetup) { // F1
+    m_captureEnabled = !m_captureEnabled;
   }
   else if (key == 261) { // F5
     ofToggleFullscreen();
   }
-  else if (key == 357 && !m_enableCapture) { // UP ARROW
+  else if (key == 357 && !m_captureEnabled) { // UP ARROW
     m_threshold += 10;
   }
-  else if (key == 357 && !m_enableCapture) { // DOWN ARROW
+  else if (key == 357 && !m_captureEnabled) { // DOWN ARROW
     m_threshold -= 10;
   }
-  else if (key == 357 && !m_enableCapture) { // LEFT ARROW
+  else if (key == 357 && !m_captureEnabled) { // LEFT ARROW
     m_threshold += 1;
   }
-  else if (key == 357 && !m_enableCapture) { // RIGHT ARROW
+  else if (key == 357 && !m_captureEnabled) { // RIGHT ARROW
     m_threshold -= 1;
+  }
+  else if (key == 32 && !m_isArduinoConnected) {
+    // trigger capture by pressing SPACE when no Arduino is connected
+    captureImage();
   }
 
   // limit threshold range
@@ -203,7 +214,7 @@ void ofApp::setupArduino(const int & version) { // taken from ofArduino example
   ofRemoveListener(m_arduino.EInitialized, this, &ofApp::setupArduino);
 
   // it is now safe to send commands to the Arduino
-  m_arduinoSetup = true;
+  m_isArduinoSetup = true;
 
   // print firmware name and version to the console
   ofLogNotice() << m_arduino.getFirmwareName();
