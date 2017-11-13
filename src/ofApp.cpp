@@ -10,20 +10,47 @@ void ofApp::setup(){
   m_isArduinoConnected = false;
   m_isArduinoSetup = false;
   m_captureEnabled = false;
-
   m_valueA0 = -1;
   m_state = LOW;
-
   m_threshold = 400;
-
   m_lastCaptureTriggered = -1.0;
 
+  
   m_isArduinoConnected = m_arduino.connect("/dev/ttyACM0", 57600);
 
 	// listen for EInitialized notification. this indicates that
 	// the arduino is ready to receive commands and it is safe to
 	// call setupArduino()
 	ofAddListener(m_arduino.EInitialized, this, &ofApp::setupArduino);
+
+
+  if (m_settings.loadFile("settings.xml")) {
+    m_imgFolder = m_settings.getValue("gphotoShow:imageFolder", "FAILED");
+    m_imgCount = m_settings.getValue("gphotoShow:imageCount", -1);
+
+    cout << "Image folder: " << m_imgFolder << endl;
+    cout << "Image count:  " << m_imgCount << endl;
+  }
+  else {
+    m_imgFolder = "FAILED";
+    m_imgCount = -1;
+  }
+
+
+  if (m_imgFolder != "FAILED" && m_imgCount > -1) {
+    ofFile dir(m_imgFolder);
+
+    if (!dir.exists()) {
+      cout << "WARNING: Image folder '" << m_imgFolder
+      << "' does not exist. Please create this folder and restart for images to be saved." << endl;
+
+      m_imgCount = -1;
+    }
+  }
+  else {
+    cout << "WARNING: Failed to read valid settings from 'data/settings.xml'. Please re-evaluate your settings and restart for images to be saved." << endl;
+    m_imgCount = -1;
+  }
 
   ofHideCursor();
 }
@@ -146,15 +173,36 @@ bool ofApp::captureImage() {
 
   m_busy = true;
 
-  // try to capture image
-  ret = (system("gphoto2 --capture-image-and-download --force-overwrite --filename=data/latest.jpg") == 0);
+  if (m_imgCount == -1) { // images will not be stored
 
-  if (ret) {
-    // load captured image into image object
-    ret = m_pLoadImg->load("latest.jpg");
+    // try to capture image
+    ret = (system("gphoto2 --capture-image-and-download --force-overwrite --filename=data/latest.jpg") == 0);
 
-    // resize image to display size due to problems with large DSLR images on Raspberry Pi
-    m_pLoadImg->resize(m_dispW, m_dispW/m_dispImgAspect);
+    if (ret) {
+      // load captured image into image object
+      ret = m_pLoadImg->load("latest.jpg");
+
+      // resize image to display size due to problems with large DSLR images on Raspberry Pi
+      m_pLoadImg->resize(m_dispW, m_dispW/m_dispImgAspect);
+    }
+  }
+  else { // images will be stored in m_imgFolder with m_imgCount numbering
+    sprintf(m_imgPath, "%s/img_%05d.jpg", m_imgFolder.c_str(), m_imgCount);
+    sprintf(m_gphotoCmd, "gphoto2 --capture-image-and-download --force-overwrite --filename=%s", m_imgPath);
+
+    ret = (system(m_gphotoCmd) == 0);
+
+    if (ret) {
+      m_imgCount++;
+      m_settings.setValue("gphotoShow:imageCount", m_imgCount);
+      m_settings.saveFile("settings.xml");
+
+      // load captured image into image object
+      ret = m_pLoadImg->load(m_imgPath);
+
+      // resize image to display size due to problems with large DSLR images on Raspberry Pi
+      m_pLoadImg->resize(m_dispW, m_dispW/m_dispImgAspect);
+    }
   }
 
 
