@@ -1,4 +1,14 @@
 <gphotoShow>
     <imageFolder>/media/usb/glasbank</imageFolder>
-    <imageCount>0</imageCount>
+    <imageCount>580</imageCount>
+    <imageCommand appendWhiteSpace="1">raspistill -n -mm spot -o</imageCommand>
+    <!-- comment the above and uncomment this line to use a DSLR via gphoto 
+    <imageCommand>gphoto2 --capture-image-and-download --force-overwrite --filename=</imageCommand> 
+    -->
+    <horizontalFlip>1</horizontalFlip>
+    <verticalFlip>1</verticalFlip>
+    <threshold>210</threshold>
+    <thresholdMin>0</thresholdMin>
+    <thresholdMax>830</thresholdMax>
+    <fitting>0.199999928</fitting>
 </gphotoShow>

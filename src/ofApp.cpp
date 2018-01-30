@@ -12,7 +12,7 @@ void ofApp::setup(){
   m_captureEnabled = false;
   m_valueA0 = -1;
   m_state = LOW;
-  m_threshold = 400;
+  m_threshold = 180;
   m_lastCaptureTriggered = -1.0;
 
   
@@ -27,14 +27,45 @@ void ofApp::setup(){
   if (m_settings.loadFile("settings.xml")) {
     m_imgFolder = m_settings.getValue("gphotoShow:imageFolder", "FAILED");
     m_imgCount = m_settings.getValue("gphotoShow:imageCount", -1);
-
-    cout << "Image folder: " << m_imgFolder << endl;
-    cout << "Image count:  " << m_imgCount << endl;
+    m_flipV = (m_settings.getValue("gphotoShow:verticalFlip", 0) != 0);
+    m_flipH = (m_settings.getValue("gphotoShow:horizontalFlip", 0) != 0);   
+    m_imgCmd = m_settings.getValue("gphotoShow:imageCommand", "NO COMMAND");
+    
+    m_settings.pushTag("gphotoShow");
+    if (m_settings.attributeExists("imageCommand", "appendWhiteSpace"))
+		m_imgCmd.append(" ");
+	m_settings.popTag();
+    
+    m_threshold = m_settings.getValue("gphotoShow:threshold", 180);
+    m_thresholdMin = m_settings.getValue("gphotoShow:thresholdMin", 0);
+    m_thresholdMax = m_settings.getValue("gphotoShow:thresholdMax", 830);
+    
+    m_fitting = m_settings.getValue("gphotoShow:fitting", 1.0);
   }
   else {
     m_imgFolder = "FAILED";
     m_imgCount = -1;
+    m_flipH = false;
+    m_flipV = false;
+    m_imgCmd = "NO COMMAND";
+    
+    m_threshold = 180;
+    m_thresholdMin = 0;
+    m_thresholdMax = 830;
+    
+    m_fitting = 1.0;
   }
+
+
+  cout << "Image folder:    " << m_imgFolder << endl;
+  cout << "Image count:     " << m_imgCount << endl;
+  cout << "Horizontal flip: " << (m_flipH ? "ON" : "OFF") << endl;
+  cout << "Vertical flip:   " << (m_flipV ? "ON" : "OFF") << endl;
+  cout << "Image command:   '" << m_imgCmd << "'" << endl;
+  cout << "Threshold:       " << m_threshold << endl;
+  cout << "Threshold min:   " << m_thresholdMin << endl;
+  cout << "Threshold max:   " << m_thresholdMax << endl;
+  cout << "Fitting:         " << m_fitting << endl;
 
 
   if (m_imgFolder != "FAILED" && m_imgCount > -1) {
@@ -53,6 +84,8 @@ void ofApp::setup(){
   }
 
   ofHideCursor();
+  
+  m_dataThread.startThread();
 }
 
 //--------------------------------------------------------------
@@ -105,11 +138,15 @@ void ofApp::draw(){
   else if (!m_captureEnabled) {
 
     ofDrawBitmapStringHighlight("CALIBRATION MODE", 200, 200);
-    ofDrawBitmapStringHighlight("Press 'F1' to switch between CALIBRATION and CAPTURE MODE", 200,220);
-    ofDrawBitmapStringHighlight("Press 'F5' to toggle between WINDOW and FULLSCREEN MODE", 200,240);
-    ofDrawBitmapStringHighlight("Press 'F9' to EXIT", 200,260);
-    ofDrawBitmapStringHighlight("Use ARROW keys to adjust THRESHOLD", 200,280);
-    ofDrawBitmapStringHighlight("Threshold:    " + ofToString(m_threshold) + "\nSensor value: " + ofToString(m_valueA0), 200,320);
+    ofDrawBitmapStringHighlight("Press 'C' to switch between CALIBRATION and CAPTURE MODE", 200,220);
+    ofDrawBitmapStringHighlight("Press 'F' to toggle between WINDOW and FULLSCREEN MODE", 200,240);
+    ofDrawBitmapStringHighlight("Press 'H' to flip image horizontally", 200,260);
+    ofDrawBitmapStringHighlight("Press 'V' to flip image vertically", 200,280);
+    ofDrawBitmapStringHighlight("Press 'M' to zoom in", 200,300);
+    ofDrawBitmapStringHighlight("Press 'N' to zoom out", 200,320);
+    ofDrawBitmapStringHighlight("Press 'Q' to QUIT", 200,340);
+    ofDrawBitmapStringHighlight("Use ARROW keys to adjust THRESHOLD", 200,360);
+    ofDrawBitmapStringHighlight("Threshold:    " + ofToString(m_threshold) + "\nSensor value: " + ofToString(m_valueA0), 200,380);
 
   }
 }
@@ -119,6 +156,8 @@ void ofApp::draw(){
 void ofApp::exit(){
 
   m_arduino.disconnect();
+  
+  m_dataThread.stopThread();
 
   delete m_pDispImg;
   delete m_pLoadImg;
@@ -127,40 +166,96 @@ void ofApp::exit(){
 
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key){
-  //cout << key << endl;
+  //cout << "   " << key << endl;
 
-  if (key == 265) { // F9
+  if (key == 113) { // Q
     //while (m_busy);
     ofExit();
   }
-  else if (key == 257 && m_isArduinoSetup) { // F1
+  else if (key == 99 && m_isArduinoSetup) { // C
     m_captureEnabled = !m_captureEnabled;
   }
-  else if (key == 261) { // F5
+  else if (key == 102) { // F
     ofToggleFullscreen();
+  }  
+  else if (key == 118) { // V
+    m_flipV = !m_flipV;
+    m_settings.setValue("gphotoShow:verticalFlip", (m_flipV ? 1 : 0));
+    m_settings.saveFile("settings.xml");
+  }  
+  else if (key == 104) { // H
+    m_flipH = !m_flipH;
+    m_settings.setValue("gphotoShow:horizontalFlip", (m_flipH ? 1 : 0));
+    m_settings.saveFile("settings.xml");
+  }
+  else if (key == 109) { // M
+    m_fitting += 0.1;
+    if (m_fitting > 1.0)
+		m_fitting = 1.0;
+    m_settings.setValue("gphotoShow:fitting", m_fitting);
+    m_settings.saveFile("settings.xml");
+  }
+  else if (key == 110) { // N
+    m_fitting -= 0.1;
+    if (m_fitting < 0.0)
+		m_fitting = 0.0;
+    m_settings.setValue("gphotoShow:fitting", m_fitting);
+    m_settings.saveFile("settings.xml");
   }
   else if (key == 357 && !m_captureEnabled) { // UP ARROW
     m_threshold += 10;
+    
+    // limit threshold range
+	if (m_threshold > m_thresholdMax)
+	  m_threshold = m_thresholdMax;
+    else if (m_threshold < m_thresholdMin)
+	  m_threshold = m_thresholdMin;    
+	  
+    m_settings.setValue("gphotoShow:threshold", m_threshold);
+    m_settings.saveFile("settings.xml");	
   }
   else if (key == 357 && !m_captureEnabled) { // DOWN ARROW
     m_threshold -= 10;
+    
+    // limit threshold range
+	if (m_threshold > m_thresholdMax)
+	  m_threshold = m_thresholdMax;
+    else if (m_threshold < m_thresholdMin)
+	  m_threshold = m_thresholdMin;    
+	  
+    m_settings.setValue("gphotoShow:threshold", m_threshold);
+    m_settings.saveFile("settings.xml");	
   }
   else if (key == 357 && !m_captureEnabled) { // LEFT ARROW
     m_threshold += 1;
+    
+    // limit threshold range
+	if (m_threshold > m_thresholdMax)
+	  m_threshold = m_thresholdMax;
+    else if (m_threshold < m_thresholdMin)
+	  m_threshold = m_thresholdMin;    
+	  
+    m_settings.setValue("gphotoShow:threshold", m_threshold);
+    m_settings.saveFile("settings.xml");	
   }
   else if (key == 357 && !m_captureEnabled) { // RIGHT ARROW
     m_threshold -= 1;
+    
+    // limit threshold range
+	if (m_threshold > m_thresholdMax)
+	  m_threshold = m_thresholdMax;
+    else if (m_threshold < m_thresholdMin)
+	  m_threshold = m_thresholdMin;    
+	  
+    m_settings.setValue("gphotoShow:threshold", m_threshold);
+    m_settings.saveFile("settings.xml");	
   }
   else if (key == 32 && !m_isArduinoConnected) {
     // trigger capture by pressing SPACE when no Arduino is connected
     captureImage();
   }
 
-  // limit threshold range
-  if (m_threshold > 830)
-    m_threshold = 830;
-  else if (m_threshold < 0)
-    m_threshold = 0;
+
 }
 
 
@@ -175,8 +270,10 @@ bool ofApp::captureImage() {
 
   if (m_imgCount == -1) { // images will not be stored
 
+	sprintf(m_gphotoCmd, "%sdata/latest.jpg", m_imgCmd.c_str());
+
     // try to capture image
-    ret = (system("gphoto2 --capture-image-and-download --force-overwrite --filename=data/latest.jpg") == 0);
+    ret = (system(m_gphotoCmd) == 0);
 
     if (ret) {
       // load captured image into image object
@@ -188,20 +285,33 @@ bool ofApp::captureImage() {
   }
   else { // images will be stored in m_imgFolder with m_imgCount numbering
     sprintf(m_imgPath, "%s/img_%05d.jpg", m_imgFolder.c_str(), m_imgCount);
-    sprintf(m_gphotoCmd, "gphoto2 --capture-image-and-download --force-overwrite --filename=%s", m_imgPath);
+    sprintf(m_gphotoCmd, "%sdata/latest.jpg", m_imgCmd.c_str());
 
     ret = (system(m_gphotoCmd) == 0);
-
+   
     if (ret) {
       m_imgCount++;
       m_settings.setValue("gphotoShow:imageCount", m_imgCount);
       m_settings.saveFile("settings.xml");
 
       // load captured image into image object
-      ret = m_pLoadImg->load(m_imgPath);
+      ret = m_pLoadImg->load("latest.jpg");
 
       // resize image to display size due to problems with large DSLR images on Raspberry Pi
       m_pLoadImg->resize(m_dispW, m_dispW/m_dispImgAspect);
+  
+      m_dataThread.lock();
+      m_dataThread.m_imgPath = m_imgPath;
+      m_dataThread.m_newImgAvailable = true;
+      m_dataThread.unlock();
+  
+    
+    /*
+      sprintf(m_gphotoCmd, "cp data/latest.jpg %s", m_imgPath);
+   cout << "copy... " << flush;
+      system(m_gphotoCmd);
+   cout << "DONE" << endl << flush;
+*/
     }
   }
 
@@ -232,23 +342,31 @@ void ofApp::drawImage() {
   }
 
   if (m_pDispImg->isAllocated()) {
-
-    // compute image part to be displayed. required for differing aspect ratios of screen and image
-    float sx = 0.0f;
+                       
+	float sx = 0.0f;
     float sy = 0.0f;
     float sw = m_dispImgW;
     float sh = m_dispImgH;
-
+    
     if (m_dispImgAspect >= m_dispAspect) {
-      sw = m_dispImgW * m_dispAspect/m_dispImgAspect;
-      sx = 0.5*(m_dispImgW - sw);
+      sw = m_dispW * m_dispImgAspect * m_fitting + m_dispW * (1.0 - m_fitting);
+      sx = 0.5*(m_dispW - sw);
+      sh = sw / m_dispImgAspect;
+      sy = 0.5*(m_dispH - sh);
     }
     else {
-      sh = m_dispImgH * m_dispImgAspect/m_dispAspect;
-      sy = 0.5*(m_dispImgH - sh);
+      sh = m_dispH * m_dispImgAspect * m_fitting + m_dispH * (1.0 - m_fitting);
+      sy = 0.5*(m_dispH - sh);
+      sw = sh * m_dispImgAspect;
+      sx = 0.5*(m_dispW - sw);
     }
-
-    m_pDispImg->drawSubsection(0, 0, m_dispW, m_dispH, sx, sy, sw, sh);
+    
+    ofBackground(0);
+	m_pDispImg->draw(m_flipH ? sx + sw : sx, 
+	                 m_flipV ? sy + sh : sy, 
+	                 m_flipH ? -sw : sw, 
+	                 m_flipV ? -sh : sh);
+    
   }
   else {
     ofBackground(0, 60, 100);

@@ -2,6 +2,7 @@
 
 #include "ofMain.h"
 #include "ofxXmlSettings.h"
+#include "DataThread.h"
 
 class ofApp : public ofBaseApp{
 public:
@@ -38,8 +39,13 @@ private:
 	ofxXmlSettings m_settings;  // xml settings instance
 	string m_imgFolder;         // folder where images are to be stored
 	int m_imgCount;             // image count for image file numbering
-  char m_imgPath[1024];       // buffer for image file path
+    char m_imgPath[1024];       // buffer for image file path
 	char m_gphotoCmd[1096];     // buffer for gphoto command
+	bool m_flipV;
+	bool m_flipH;
+	string m_imgCmd;
+	float m_fitting;
+	
 
 	float m_dispW, m_dispH, m_dispAspect;          // width, height and aspect ratio of display
 	float m_dispImgW, m_dispImgH, m_dispImgAspect; // width, height and aspect ratio of displayed image
@@ -53,9 +59,13 @@ private:
 	bool m_isArduinoConnected;
 	bool m_isArduinoSetup;
 
-	int m_threshold;       // sensor value threshold (0 - 830) for capture triggering
+	int m_threshold;       // sensor value threshold for capture triggering
+	int m_thresholdMin;
+	int m_thresholdMax;
 	IrSensorState m_state; // sensor's state: LOW if below threshold, HIGH otherwise
 
 	float m_lastCaptureTriggered;  // time of last capture trigger
 	bool m_captureEnabled;         // enables/disables capture
+	
+	DataThread m_dataThread;
 };
