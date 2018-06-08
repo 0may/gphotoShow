@@ -214,7 +214,7 @@ void ofApp::keyPressed(int key){
     m_settings.setValue("gphotoShow:threshold", m_threshold);
     m_settings.saveFile("settings.xml");	
   }
-  else if (key == 357 && !m_captureEnabled) { // DOWN ARROW
+  else if (key == 359 && !m_captureEnabled) { // DOWN ARROW
     m_threshold -= 10;
     
     // limit threshold range
@@ -226,8 +226,8 @@ void ofApp::keyPressed(int key){
     m_settings.setValue("gphotoShow:threshold", m_threshold);
     m_settings.saveFile("settings.xml");	
   }
-  else if (key == 357 && !m_captureEnabled) { // LEFT ARROW
-    m_threshold += 1;
+  else if (key == 356 && !m_captureEnabled) { // LEFT ARROW
+    m_threshold -= 1;
     
     // limit threshold range
 	if (m_threshold > m_thresholdMax)
@@ -238,8 +238,8 @@ void ofApp::keyPressed(int key){
     m_settings.setValue("gphotoShow:threshold", m_threshold);
     m_settings.saveFile("settings.xml");	
   }
-  else if (key == 357 && !m_captureEnabled) { // RIGHT ARROW
-    m_threshold -= 1;
+  else if (key == 358 && !m_captureEnabled) { // RIGHT ARROW
+    m_threshold += 1;
     
     // limit threshold range
 	if (m_threshold > m_thresholdMax)
